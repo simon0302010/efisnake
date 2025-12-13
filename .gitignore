@@ -1,0 +1,4 @@
+/target
+OVMF*
+esp/
+run.sh
