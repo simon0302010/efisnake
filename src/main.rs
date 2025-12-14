@@ -43,11 +43,8 @@ impl Buffer {
     fn rectangle(&mut self, x: usize, y: usize, w: usize, h: usize, color: BltPixel, fill: bool) {
         for dy in 0..h {
             for dx in 0..w {
-                if fill {
-                    if let Some(pixel) = self.pixel(x + dx, y + dy) {
-                        *pixel = color;
-                    }
-                } else if (dy == 0 || dy == h - 1) || (dx == 0 || dx == w - 1) {
+                let should_draw = fill || (dy == 0 || dy == h - 1) || (dx == 0 || dx == w - 1);
+                if should_draw {
                     if let Some(pixel) = self.pixel(x + dx, y + dy) {
                         *pixel = color;
                     }
@@ -86,7 +83,7 @@ fn game() -> Result {
 
     // list of blocks
     let mut blocks: Vec<Vec2> = Vec::new();
-    let mut length: usize = 10;
+    let mut length: usize = 5;
 
     let mut direction = "down";
 
@@ -97,40 +94,38 @@ fn game() -> Result {
     let mut dead = false;
 
     while running {
-        loop {
-            if let Ok(Some(key)) = system::with_stdin(|stdin| stdin.read_key()) {
-                match key {
-                    Key::Printable(c) => {
-                        if c == uefi::Char16::try_from('q').unwrap_or_default()
-                            || c == uefi::Char16::try_from('Q').unwrap_or_default()
-                        {
-                            running = false;
-                        }
+        while let Ok(Some(key)) = system::with_stdin(|stdin| stdin.read_key()) {
+            match key {
+                Key::Printable(c) => {
+                    if c == uefi::Char16::try_from('q').unwrap_or_default()
+                        || c == uefi::Char16::try_from('Q').unwrap_or_default()
+                    {
+                        running = false;
+                    } else if c == uefi::Char16::try_from(' ').unwrap_or_default() {
+                        length += 1;
                     }
-                    Key::Special(ScanCode::UP) => {
-                        if direction != "down" {
-                            direction = "up";
-                        }
-                    }
-                    Key::Special(ScanCode::DOWN) => {
-                        if direction != "up" {
-                            direction = "down";
-                        }
-                    }
-                    Key::Special(ScanCode::RIGHT) => {
-                        if direction != "left" {
-                            direction = "right";
-                        }
-                    }
-                    Key::Special(ScanCode::LEFT) => {
-                        if direction != "right" {
-                            direction = "left";
-                        }
-                    }
-                    _ => {}
                 }
-            } else {
-                break;
+                Key::Special(ScanCode::UP) => {
+                    if direction != "down" {
+                        direction = "up";
+                    }
+                }
+                Key::Special(ScanCode::DOWN) => {
+                    if direction != "up" {
+                        direction = "down";
+                    }
+                }
+                Key::Special(ScanCode::RIGHT) => {
+                    if direction != "left" {
+                        direction = "right";
+                    }
+                }
+                Key::Special(ScanCode::LEFT) => {
+                    if direction != "right" {
+                        direction = "left";
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -167,8 +162,7 @@ fn game() -> Result {
             // there is probably a better way to do this
             if blocks
                 .iter()
-                .find(|block| block.x == player_x && block.y == player_y)
-                .is_some()
+                .any(|block| block.x == player_x && block.y == player_y)
             {
                 dead = true;
             }
@@ -185,20 +179,18 @@ fn game() -> Result {
 
         // draw all blocks
         for (i, block) in blocks.iter().enumerate() {
-            let color: BltPixel;
-            if !dead {
-                color = if i == blocks.len() - 1 {
+            // color based on dead or not and head or not
+            let color = if !dead {
+                if i == blocks.len() - 1 {
                     BltPixel::new(0, 200, 0)
                 } else {
                     BltPixel::new(0, 100, 0)
-                };
+                }
+            } else if i == blocks.len() - 1 {
+                BltPixel::new(200, 0, 0)
             } else {
-                color = if i == blocks.len() - 1 {
-                    BltPixel::new(200, 0, 0)
-                } else {
-                    BltPixel::new(100, 0, 0)
-                };
-            }
+                BltPixel::new(100, 0, 0)
+            };
 
             buffer.rectangle(
                 block.x as usize,
@@ -209,7 +201,7 @@ fn game() -> Result {
                 true,
             );
         }
-        
+
         buffer.blit(&mut gop)?;
 
         boot::stall(Duration::from_millis(200));
