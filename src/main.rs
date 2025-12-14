@@ -2,66 +2,25 @@
 #![no_std]
 
 mod misc;
+mod buffer;
 
 extern crate alloc;
 
-use alloc::vec;
 use alloc::vec::Vec;
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::mono_font::iso_8859_10::FONT_10X20;
+use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::Point;
+use embedded_graphics::text::Text;
+use embedded_graphics::Drawable;
 use core::time::Duration;
 use uefi::prelude::*;
-use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
+use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::text::{Key, ScanCode};
 use uefi::{boot, Result};
 
+use crate::buffer::Buffer;
 use crate::misc::Vec2;
-
-struct Buffer {
-    width: usize,
-    height: usize,
-    pixels: Vec<BltPixel>,
-}
-
-impl Buffer {
-    fn new(width: usize, height: usize) -> Self {
-        Buffer {
-            width,
-            height,
-            pixels: vec![BltPixel::new(0, 0, 0); width * height],
-        }
-    }
-
-    fn clear(&mut self) {
-        for pixel in &mut self.pixels {
-            *pixel = BltPixel::new(0, 0, 0);
-        }
-    }
-
-    fn pixel(&mut self, x: usize, y: usize) -> Option<&mut BltPixel> {
-        self.pixels.get_mut(y * self.width + x)
-    }
-
-    fn rectangle(&mut self, x: usize, y: usize, w: usize, h: usize, color: BltPixel, fill: bool) {
-        for dy in 0..h {
-            for dx in 0..w {
-                let should_draw = fill || (dy == 0 || dy == h - 1) || (dx == 0 || dx == w - 1);
-                if should_draw {
-                    if let Some(pixel) = self.pixel(x + dx, y + dy) {
-                        *pixel = color;
-                    }
-                }
-            }
-        }
-    }
-
-    fn blit(&self, gop: &mut GraphicsOutput) -> Result {
-        gop.blt(BltOp::BufferToVideo {
-            buffer: &self.pixels,
-            src: BltRegion::Full,
-            dest: (0, 0),
-            dims: (self.width, self.height),
-        })
-    }
-}
 
 fn game() -> Result {
     let gop_handle = boot::get_handle_for_protocol::<GraphicsOutput>()?;
@@ -83,9 +42,11 @@ fn game() -> Result {
 
     // list of blocks
     let mut blocks: Vec<Vec2> = Vec::new();
-    let mut length: usize = 5;
+    let mut length: usize = 1;
 
     let mut direction = "down";
+
+    let score_style = MonoTextStyle::new(&FONT_10X20, Rgb888::new(100, 100, 255));
 
     // will be used later
     // let mut rng = Rng::new();
@@ -101,8 +62,13 @@ fn game() -> Result {
                         || c == uefi::Char16::try_from('Q').unwrap_or_default()
                     {
                         running = false;
-                    } else if c == uefi::Char16::try_from(' ').unwrap_or_default() {
-                        length += 1;
+                    } else if c == uefi::Char16::try_from(' ').unwrap_or_default() && dead {
+                        dead = false;
+                        blocks = Vec::new();
+                        length = 1;
+                        direction = "down";
+                        player_x = ((grid_w / 2) * block_size) + offset_x;
+                        player_y = ((grid_h / 2) * block_size) + offset_y;
                     }
                 }
                 Key::Special(ScanCode::UP) => {
@@ -137,18 +103,30 @@ fn game() -> Result {
             match direction {
                 "up" => {
                     let new_pos = (grid_pos_y - 1).clamp(0, grid_h - 1);
+                    if new_pos != (grid_pos_y - 1) {
+                        dead = true;
+                    }
                     player_y = new_pos * block_size + offset_y;
                 }
                 "down" => {
                     let new_pos = (grid_pos_y + 1).clamp(0, grid_h - 1);
+                    if new_pos != (grid_pos_y + 1) {
+                        dead = true;
+                    }
                     player_y = new_pos * block_size + offset_y;
                 }
                 "right" => {
                     let new_pos = (grid_pos_x + 1).clamp(0, grid_w - 1);
+                    if new_pos != (grid_pos_x + 1) {
+                        dead = true;
+                    }
                     player_x = new_pos * block_size + offset_x;
                 }
                 "left" => {
                     let new_pos = (grid_pos_x - 1).clamp(0, grid_w - 1);
+                    if new_pos != (grid_pos_x - 1) {
+                        dead = true;
+                    }
                     player_x = new_pos * block_size + offset_x;
                 }
                 _ => {}
@@ -202,15 +180,11 @@ fn game() -> Result {
             );
         }
 
+        let _ = Text::new("Score", Point::new(10, 20), score_style).draw(&mut buffer);
+
         buffer.blit(&mut gop)?;
 
-        boot::stall(Duration::from_millis(200));
-
-        // temporary
-        if dead {
-            boot::stall(Duration::from_secs(3));
-            running = false;
-        }
+        boot::stall(Duration::from_millis(125));
     }
 
     Ok(())
