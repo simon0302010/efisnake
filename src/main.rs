@@ -6,6 +6,7 @@ mod buffer;
 
 extern crate alloc;
 
+use alloc::format;
 use alloc::vec::Vec;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::mono_font::iso_8859_10::FONT_10X20;
@@ -46,7 +47,7 @@ fn game() -> Result {
 
     let mut direction = "down";
 
-    let score_style = MonoTextStyle::new(&FONT_10X20, Rgb888::new(100, 100, 255));
+    let score_style = MonoTextStyle::new(&FONT_10X20, Rgb888::new(30, 30, 255));
 
     // will be used later
     // let mut rng = Rng::new();
@@ -90,6 +91,9 @@ fn game() -> Result {
                     if direction != "right" {
                         direction = "left";
                     }
+                }
+                Key::Special(ScanCode::ESCAPE) => {
+                    length += 1;
                 }
                 _ => {}
             }
@@ -180,7 +184,7 @@ fn game() -> Result {
             );
         }
 
-        let _ = Text::new("Score", Point::new(10, 20), score_style).draw(&mut buffer);
+        let _ = Text::new(format!("Score: {}", (length - 1).max(0)).as_str(), Point::new(10, 20), score_style).draw(&mut buffer);
 
         buffer.blit(&mut gop)?;
 
