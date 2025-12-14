@@ -23,6 +23,7 @@ use uefi::{boot, Result};
 use crate::buffer::Buffer;
 use crate::rand::Rng;
 
+#[derive(Clone, Copy)]
 pub struct Vec2 {
     pub x: isize,
     pub y: isize,
@@ -73,6 +74,7 @@ fn game() -> Result {
                     } else if c == uefi::Char16::try_from(' ').unwrap_or_default() && dead {
                         dead = false;
                         blocks = Vec::new();
+                        fruits = Vec::new();
                         length = 1;
                         direction = "down";
                         player_x = ((grid_w / 2) * block_size) + offset_x;
@@ -161,26 +163,45 @@ fn game() -> Result {
                 x: player_x,
                 y: player_y,
             });
+
+            // check if player is eating fruit (compare in grid coordinates)
+            let grid_pos_x = (player_x - offset_x) / block_size;
+            let grid_pos_y = (player_y - offset_y) / block_size;
+            if let Some(idx) = fruits.iter().position(|f| f.x == grid_pos_x && f.y == grid_pos_y) {
+                fruits.remove(idx);
+                length += 1;
+            }
         }
 
         // clear screen
         buffer.clear();
 
-        // generate fruits
+        // generate fruits (store in grid coordinates)
         if rng.random_bool(0.05) && fruits.len() < 2 {
-            if let Some(pos) = rng.random_block(&blocks, grid_w as usize, grid_h as usize) {
+            let blocks_grid: Vec<Vec2> = blocks
+                .iter()
+                .map(|b| Vec2 {
+                    x: (b.x - offset_x) / block_size,
+                    y: (b.y - offset_y) / block_size,
+                })
+                .collect();
+            let mut occupied = blocks_grid;
+            occupied.extend(fruits.iter().cloned());
+            if let Some(pos) = rng.random_block(&occupied, grid_w as usize, grid_h as usize) {
                 fruits.push(Vec2 {
-                    x: pos.x as isize * block_size + offset_x,
-                    y: pos.y as isize * block_size + offset_y,
+                    x: pos.x as isize,
+                    y: pos.y as isize,
                 });
             }
         }
 
-        // render fruits
+        // render fruits (convert grid to pixel coordinates when drawing)
         for fruit in &fruits {
+            let pixel_x = fruit.x * block_size + offset_x;
+            let pixel_y = fruit.y * block_size + offset_y;
             buffer.rectangle(
-                (fruit.x + block_size / 4) as usize,
-                (fruit.y + block_size / 4) as usize,
+                (pixel_x + block_size / 4) as usize,
+                (pixel_y + block_size / 4) as usize,
                 block_size as usize / 2,
                 block_size as usize / 2,
                 BltPixel::new(220, 30, 70),

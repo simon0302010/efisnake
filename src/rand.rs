@@ -31,7 +31,8 @@ impl Rng {
 
     // generates a random integer in the specified range
     pub fn random_range(&mut self, min: i64, max: i64) -> i64 {
-        (self.random_float() * ((max - min + 1) + min) as f64) as i64
+        let range = max - min;
+        min + (self.random_float() * range as f64) as i64
     }
 
     /// generates a random float from 0.0 to 1.0
