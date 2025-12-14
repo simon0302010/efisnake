@@ -53,8 +53,6 @@ fn game() -> Result {
 
     let mut direction = "down";
 
-    let score_style = MonoTextStyle::new(&FONT_10X20, Rgb888::new(30, 30, 255));
-
     let mut fruits: Vec<Vec2> = Vec::new();
 
     // rng
@@ -167,7 +165,10 @@ fn game() -> Result {
             // check if player is eating fruit (compare in grid coordinates)
             let grid_pos_x = (player_x - offset_x) / block_size;
             let grid_pos_y = (player_y - offset_y) / block_size;
-            if let Some(idx) = fruits.iter().position(|f| f.x == grid_pos_x && f.y == grid_pos_y) {
+            if let Some(idx) = fruits
+                .iter()
+                .position(|f| f.x == grid_pos_x && f.y == grid_pos_y)
+            {
                 fruits.remove(idx);
                 length += 1;
             }
@@ -177,7 +178,7 @@ fn game() -> Result {
         buffer.clear();
 
         // generate fruits (store in grid coordinates)
-        if rng.random_bool(0.05) && fruits.len() < 2 {
+        if rng.random_bool(0.05) && fruits.len() < 2 && !dead {
             let blocks_grid: Vec<Vec2> = blocks
                 .iter()
                 .map(|b| Vec2 {
@@ -237,9 +238,36 @@ fn game() -> Result {
         let _ = Text::new(
             format!("Score: {}", (length - 1).max(0)).as_str(),
             Point::new(10, 20),
-            score_style,
+            MonoTextStyle::new(&FONT_10X20, Rgb888::new(30, 30, 255)),
         )
         .draw(&mut buffer);
+
+        if dead {
+            let style = MonoTextStyle::new(&FONT_10X20, Rgb888::new(255, 0, 0));
+
+            let game_over_text = "Game Over!";
+            let restart_text = "Press Space to restart";
+
+            let game_over_width = game_over_text.len() as u32 * 10;
+            let restart_width = restart_text.len() as u32 * 10;
+
+            let game_over_x = (width / 2) as i32 - (game_over_width as i32 / 2);
+            let restart_x = (width / 2) as i32 - (restart_width as i32 / 2);
+
+            let _ = Text::new(
+            game_over_text,
+            Point::new(game_over_x, (height / 2 - 10) as i32),
+            style,
+            )
+            .draw(&mut buffer);
+
+            let _ = Text::new(
+            restart_text,
+            Point::new(restart_x, (height / 2 + 15) as i32),
+            style,
+            )
+            .draw(&mut buffer);
+        }
 
         buffer.blit(&mut gop)?;
 
