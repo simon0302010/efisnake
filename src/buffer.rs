@@ -1,10 +1,13 @@
-use alloc::vec::Vec;
 use alloc::vec;
-use uefi::{Result, proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput}};
+use alloc::vec::Vec;
+use uefi::{
+    proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput},
+    Result,
+};
 
-use embedded_graphics::prelude::*;
 use embedded_graphics::geometry::OriginDimensions;
 use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::*;
 
 pub struct Buffer {
     width: usize,
@@ -31,7 +34,15 @@ impl Buffer {
         self.pixels.get_mut(y * self.width + x)
     }
 
-    pub fn rectangle(&mut self, x: usize, y: usize, w: usize, h: usize, color: BltPixel, fill: bool) {
+    pub fn rectangle(
+        &mut self,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+        color: BltPixel,
+        fill: bool,
+    ) {
         for dy in 0..h {
             for dx in 0..w {
                 let should_draw = fill || (dy == 0 || dy == h - 1) || (dx == 0 || dx == w - 1);

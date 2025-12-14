@@ -1,27 +1,32 @@
 #![no_main]
 #![no_std]
 
-mod misc;
 mod buffer;
+mod rand;
 
 extern crate alloc;
 
 use alloc::format;
 use alloc::vec::Vec;
-use embedded_graphics::mono_font::MonoTextStyle;
+use core::time::Duration;
 use embedded_graphics::mono_font::iso_8859_10::FONT_10X20;
+use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::text::Text;
 use embedded_graphics::Drawable;
-use core::time::Duration;
 use uefi::prelude::*;
 use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::text::{Key, ScanCode};
 use uefi::{boot, Result};
 
 use crate::buffer::Buffer;
-use crate::misc::Vec2;
+use crate::rand::Rng;
+
+pub struct Vec2 {
+    pub x: isize,
+    pub y: isize,
+}
 
 fn game() -> Result {
     let gop_handle = boot::get_handle_for_protocol::<GraphicsOutput>()?;
@@ -49,8 +54,10 @@ fn game() -> Result {
 
     let score_style = MonoTextStyle::new(&FONT_10X20, Rgb888::new(30, 30, 255));
 
-    // will be used later
-    // let mut rng = Rng::new();
+    let mut fruits: Vec<Vec2> = Vec::new();
+
+    // rng
+    let mut rng = Rng::new();
 
     let mut running = true;
     let mut dead = false;
@@ -159,6 +166,28 @@ fn game() -> Result {
         // clear screen
         buffer.clear();
 
+        // generate fruits
+        if rng.random_bool(0.05) && fruits.len() < 2 {
+            if let Some(pos) = rng.random_block(&blocks, grid_w as usize, grid_h as usize) {
+                fruits.push(Vec2 {
+                    x: pos.x as isize * block_size + offset_x,
+                    y: pos.y as isize * block_size + offset_y,
+                });
+            }
+        }
+
+        // render fruits
+        for fruit in &fruits {
+            buffer.rectangle(
+                (fruit.x + block_size / 4) as usize,
+                (fruit.y + block_size / 4) as usize,
+                block_size as usize / 2,
+                block_size as usize / 2,
+                BltPixel::new(220, 30, 70),
+                true,
+            );
+        }
+
         // draw all blocks
         for (i, block) in blocks.iter().enumerate() {
             // color based on dead or not and head or not
@@ -184,7 +213,12 @@ fn game() -> Result {
             );
         }
 
-        let _ = Text::new(format!("Score: {}", (length - 1).max(0)).as_str(), Point::new(10, 20), score_style).draw(&mut buffer);
+        let _ = Text::new(
+            format!("Score: {}", (length - 1).max(0)).as_str(),
+            Point::new(10, 20),
+            score_style,
+        )
+        .draw(&mut buffer);
 
         buffer.blit(&mut gop)?;
 
