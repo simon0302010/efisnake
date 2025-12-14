@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use core::time::Duration;
 use uefi::prelude::*;
 use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
-use uefi::proto::console::text::Key;
+use uefi::proto::console::text::{Key, ScanCode};
 use uefi::{boot, Result};
 
 use crate::rand::Rng;
@@ -74,11 +74,15 @@ fn game() -> Result {
     let (width, height) = gop.current_mode_info().resolution();
     let mut buffer = Buffer::new(width, height);
 
-    // stuff for cube
-    let rect_w = 100;
-    let rect_h = 100;
-    let rect_x = (width - rect_w) / 2;
-    let rect_y = (height - rect_h) / 2;
+    let (width_i, height_i) = (width as isize, height as isize);
+
+    // stuff for square
+    let rect_w: isize = 100;
+    let rect_h: isize = 100;
+    let mut rect_x = (width_i - rect_w) / 2;
+    let mut rect_y = (height_i - rect_h) / 2;
+
+    let speed: isize = 30;
 
     let mut rng = Rng::new();
 
@@ -92,6 +96,18 @@ fn game() -> Result {
                         break;
                     }
                 }
+                Key::Special(ScanCode::UP) => {
+                    rect_y = (rect_y - speed).clamp(0, height_i - rect_h);
+                }
+                Key::Special(ScanCode::DOWN) => {
+                    rect_y = (rect_y + speed).clamp(0, height_i - rect_h);
+                }
+                Key::Special(ScanCode::RIGHT) => {
+                    rect_x = (rect_x + speed).clamp(0, width_i - rect_w);
+                }
+                Key::Special(ScanCode::LEFT) => {
+                    rect_x = (rect_x - speed).clamp(0, width_i - rect_w);
+                }
                 _ => {}
             }
         }
@@ -100,9 +116,15 @@ fn game() -> Result {
         let g = rng.random_range(0, 255) as u8;
         let b = rng.random_range(0, 255) as u8;
 
-        // add back when cube moves
-        // buffer.clear();
-        buffer.rectangle(rect_x, rect_y, rect_w, rect_h, BltPixel::new(r, g, b), true);
+        buffer.clear();
+        buffer.rectangle(
+            rect_x as usize,
+            rect_y as usize,
+            rect_w as usize,
+            rect_h as usize,
+            BltPixel::new(r, g, b),
+            true,
+        );
         buffer.blit(&mut gop)?;
 
         boot::stall(Duration::from_millis(30));
