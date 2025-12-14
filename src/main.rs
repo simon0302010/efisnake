@@ -1,7 +1,7 @@
 #![no_main]
 #![no_std]
 
-mod rand;
+mod misc;
 
 extern crate alloc;
 
@@ -13,7 +13,7 @@ use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
 use uefi::proto::console::text::{Key, ScanCode};
 use uefi::{boot, Result};
 
-use crate::rand::Rng;
+use crate::misc::Vec2;
 
 struct Buffer {
     width: usize,
@@ -30,7 +30,6 @@ impl Buffer {
         }
     }
 
-    #[allow(unused)]
     fn clear(&mut self) {
         for pixel in &mut self.pixels {
             *pixel = BltPixel::new(0, 0, 0);
@@ -48,7 +47,7 @@ impl Buffer {
                     if let Some(pixel) = self.pixel(x + dx, y + dy) {
                         *pixel = color;
                     }
-                } else if (dy == 0 || dy == h - 1) && (dx == 0 || dx == w - 1) {
+                } else if (dy == 0 || dy == h - 1) || (dx == 0 || dx == w - 1) {
                     if let Some(pixel) = self.pixel(x + dx, y + dy) {
                         *pixel = color;
                     }
@@ -82,21 +81,20 @@ fn game() -> Result {
     let offset_x = (width_i - grid_w * block_size) / 2;
     let offset_y = (height_i - grid_h * block_size) / 2;
 
-    // stuff for square
-    let rect_w: isize = block_size;
-    let rect_h: isize = block_size;
-    let mut rect_x = (width_i - rect_w) / 2;
-    let mut rect_y = (height_i - rect_h) / 2;
+    let mut player_x = ((grid_w / 2) * block_size) + offset_x;
+    let mut player_y = ((grid_h / 2) * block_size) + offset_y;
+
+    // list of blocks
+    let mut blocks: Vec<Vec2> = Vec::new();
+    let mut length: usize = 10;
 
     let mut direction = "down";
 
-    let mut rng = Rng::new();
-
-    let r = rng.random_range(0, 255) as u8;
-    let g = rng.random_range(0, 255) as u8;
-    let b = rng.random_range(0, 255) as u8;
+    // will be used later
+    // let mut rng = Rng::new();
 
     let mut running = true;
+    let mut dead = false;
 
     while running {
         loop {
@@ -136,41 +134,91 @@ fn game() -> Result {
             }
         }
 
-        let grid_pos_x = (rect_x - offset_x) / block_size;
-        let grid_pos_y = (rect_y - offset_y) / block_size;
+        // movement logic
+        if !dead {
+            let grid_pos_x = (player_x - offset_x) / block_size;
+            let grid_pos_y = (player_y - offset_y) / block_size;
 
-        match direction {
-            "up" => {
-                let new_pos = (grid_pos_y - 1).clamp(0, grid_h - 1);
-                rect_y = new_pos * block_size + offset_y;
+            match direction {
+                "up" => {
+                    let new_pos = (grid_pos_y - 1).clamp(0, grid_h - 1);
+                    player_y = new_pos * block_size + offset_y;
+                }
+                "down" => {
+                    let new_pos = (grid_pos_y + 1).clamp(0, grid_h - 1);
+                    player_y = new_pos * block_size + offset_y;
+                }
+                "right" => {
+                    let new_pos = (grid_pos_x + 1).clamp(0, grid_w - 1);
+                    player_x = new_pos * block_size + offset_x;
+                }
+                "left" => {
+                    let new_pos = (grid_pos_x - 1).clamp(0, grid_w - 1);
+                    player_x = new_pos * block_size + offset_x;
+                }
+                _ => {}
             }
-            "down" => {
-                let new_pos = (grid_pos_y + 1).clamp(0, grid_h - 1);
-                rect_y = new_pos * block_size + offset_y;
+
+            // only remove block if snake is too long
+            if blocks.len() >= length {
+                blocks.remove(0);
             }
-            "right" => {
-                let new_pos = (grid_pos_x + 1).clamp(0, grid_w - 1);
-                rect_x = new_pos * block_size + offset_x;
+
+            // there is probably a better way to do this
+            if blocks
+                .iter()
+                .find(|block| block.x == player_x && block.y == player_y)
+                .is_some()
+            {
+                dead = true;
             }
-            "left" => {
-                let new_pos = (grid_pos_x - 1).clamp(0, grid_w - 1);
-                rect_x = new_pos * block_size + offset_x;
-            }
-            _ => {}
+
+            // add head
+            blocks.push(Vec2 {
+                x: player_x,
+                y: player_y,
+            });
         }
 
+        // clear screen
         buffer.clear();
-        buffer.rectangle(
-            rect_x as usize,
-            rect_y as usize,
-            rect_w as usize,
-            rect_h as usize,
-            BltPixel::new(r, g, b),
-            true,
-        );
+
+        // draw all blocks
+        for (i, block) in blocks.iter().enumerate() {
+            let color: BltPixel;
+            if !dead {
+                color = if i == blocks.len() - 1 {
+                    BltPixel::new(0, 200, 0)
+                } else {
+                    BltPixel::new(0, 100, 0)
+                };
+            } else {
+                color = if i == blocks.len() - 1 {
+                    BltPixel::new(200, 0, 0)
+                } else {
+                    BltPixel::new(100, 0, 0)
+                };
+            }
+
+            buffer.rectangle(
+                block.x as usize,
+                block.y as usize,
+                block_size as usize,
+                block_size as usize,
+                color,
+                true,
+            );
+        }
+        
         buffer.blit(&mut gop)?;
 
         boot::stall(Duration::from_millis(200));
+
+        // temporary
+        if dead {
+            boot::stall(Duration::from_secs(3));
+            running = false;
+        }
     }
 
     Ok(())
