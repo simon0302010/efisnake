@@ -76,45 +76,88 @@ fn game() -> Result {
 
     let (width_i, height_i) = (width as isize, height as isize);
 
+    let block_size = (width_i.min(height_i)) / 20;
+    let grid_w = width_i / block_size;
+    let grid_h = height_i / block_size;
+    let offset_x = (width_i - grid_w * block_size) / 2;
+    let offset_y = (height_i - grid_h * block_size) / 2;
+
     // stuff for square
-    let rect_w: isize = 100;
-    let rect_h: isize = 100;
+    let rect_w: isize = block_size;
+    let rect_h: isize = block_size;
     let mut rect_x = (width_i - rect_w) / 2;
     let mut rect_y = (height_i - rect_h) / 2;
 
-    let speed: isize = 30;
+    let mut direction = "down";
 
     let mut rng = Rng::new();
 
-    loop {
-        if let Ok(Some(key)) = system::with_stdin(|stdin| stdin.read_key()) {
-            match key {
-                Key::Printable(c) => {
-                    if c == uefi::Char16::try_from('q').unwrap_or_default()
-                        || c == uefi::Char16::try_from('Q').unwrap_or_default()
-                    {
-                        break;
+    let r = rng.random_range(0, 255) as u8;
+    let g = rng.random_range(0, 255) as u8;
+    let b = rng.random_range(0, 255) as u8;
+
+    let mut running = true;
+
+    while running {
+        loop {
+            if let Ok(Some(key)) = system::with_stdin(|stdin| stdin.read_key()) {
+                match key {
+                    Key::Printable(c) => {
+                        if c == uefi::Char16::try_from('q').unwrap_or_default()
+                            || c == uefi::Char16::try_from('Q').unwrap_or_default()
+                        {
+                            running = false;
+                        }
                     }
+                    Key::Special(ScanCode::UP) => {
+                        if direction != "down" {
+                            direction = "up";
+                        }
+                    }
+                    Key::Special(ScanCode::DOWN) => {
+                        if direction != "up" {
+                            direction = "down";
+                        }
+                    }
+                    Key::Special(ScanCode::RIGHT) => {
+                        if direction != "left" {
+                            direction = "right";
+                        }
+                    }
+                    Key::Special(ScanCode::LEFT) => {
+                        if direction != "right" {
+                            direction = "left";
+                        }
+                    }
+                    _ => {}
                 }
-                Key::Special(ScanCode::UP) => {
-                    rect_y = (rect_y - speed).clamp(0, height_i - rect_h);
-                }
-                Key::Special(ScanCode::DOWN) => {
-                    rect_y = (rect_y + speed).clamp(0, height_i - rect_h);
-                }
-                Key::Special(ScanCode::RIGHT) => {
-                    rect_x = (rect_x + speed).clamp(0, width_i - rect_w);
-                }
-                Key::Special(ScanCode::LEFT) => {
-                    rect_x = (rect_x - speed).clamp(0, width_i - rect_w);
-                }
-                _ => {}
+            } else {
+                break;
             }
         }
 
-        let r = rng.random_range(0, 255) as u8;
-        let g = rng.random_range(0, 255) as u8;
-        let b = rng.random_range(0, 255) as u8;
+        let grid_pos_x = (rect_x - offset_x) / block_size;
+        let grid_pos_y = (rect_y - offset_y) / block_size;
+
+        match direction {
+            "up" => {
+                let new_pos = (grid_pos_y - 1).clamp(0, grid_h - 1);
+                rect_y = new_pos * block_size + offset_y;
+            }
+            "down" => {
+                let new_pos = (grid_pos_y + 1).clamp(0, grid_h - 1);
+                rect_y = new_pos * block_size + offset_y;
+            }
+            "right" => {
+                let new_pos = (grid_pos_x + 1).clamp(0, grid_w - 1);
+                rect_x = new_pos * block_size + offset_x;
+            }
+            "left" => {
+                let new_pos = (grid_pos_x - 1).clamp(0, grid_w - 1);
+                rect_x = new_pos * block_size + offset_x;
+            }
+            _ => {}
+        }
 
         buffer.clear();
         buffer.rectangle(
@@ -127,7 +170,7 @@ fn game() -> Result {
         );
         buffer.blit(&mut gop)?;
 
-        boot::stall(Duration::from_millis(30));
+        boot::stall(Duration::from_millis(200));
     }
 
     Ok(())
