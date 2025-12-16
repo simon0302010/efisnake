@@ -2,6 +2,12 @@
 
 Efisnake is a snake game running entirely in UEFI. This allows it to be run on any machine that supports UEFI booting without requiring an operating system to be installed.
 
+## Demo
+
+This is Efisnake running in QEMU:
+
+https://github.com/user-attachments/assets/79fd1adf-1e80-438e-8031-8c101984ad9b
+
 ## Installation
 
 Clone the repository:
