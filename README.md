@@ -10,6 +10,9 @@ https://github.com/user-attachments/assets/79fd1adf-1e80-438e-8031-8c101984ad9b
 
 ## Installation
 
+You can download a pre-built binary from the [releases page](https://github.com/simon0302010/efisnake/releases).
+> ⚠️ These binaries can be outdated. Please build from source for the latest version.
+
 Clone the repository:
 
 ```bash
@@ -52,7 +55,7 @@ You should now have the binary located at `target/<target>/release/efisnake.efi`
 1. Insert the USB drive into the target machine.
 2. Boot the machine and enter the UEFI boot menu (usually by pressing a key like F12, F10 or F8 during startup).
 3. Select the USB drive to boot from it.
-4. The Efisnake game should start automatically.
+4. The game should start automatically.
 
 ### Controls
 
