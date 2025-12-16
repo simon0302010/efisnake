@@ -1,10 +1,10 @@
 #![no_main]
 #![no_std]
 
+extern crate alloc;
+
 mod buffer;
 mod rand;
-
-extern crate alloc;
 
 use alloc::format;
 use alloc::vec::Vec;
@@ -19,6 +19,7 @@ use uefi::prelude::*;
 use uefi::proto::console::gop::{BltPixel, GraphicsOutput};
 use uefi::proto::console::text::{Key, ScanCode};
 use uefi::{boot, Result};
+use core::fmt::Write;
 
 use crate::buffer::Buffer;
 use crate::rand::Rng;
@@ -171,6 +172,9 @@ fn game() -> Result {
             {
                 fruits.remove(idx);
                 length += 1;
+                system::with_stdout(|stdout| {
+                    let _ = stdout.write_str("\x07");
+                });
             }
         }
 
